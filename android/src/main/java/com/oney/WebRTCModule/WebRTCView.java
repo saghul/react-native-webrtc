@@ -79,6 +79,8 @@ public class WebRTCView extends ViewGroup {
 
         setMirror(false);
         setScalingType(DEFAULT_SCALING_TYPE);
+
+        surfaceViewRenderer.setEnableHardwareScaler(true);
     }
 
     /**
