@@ -52,11 +52,17 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
     private static final int DEFAULT_HEIGHT = 720;
     private static final int DEFAULT_FPS    = 30;
 
-    private final PeerConnectionFactory mFactory;
+    public final PeerConnectionFactory mFactory;
     private final SparseArray<PeerConnectionObserver> mPeerConnectionObservers;
     public final Map<String, MediaStream> mMediaStreams;
     public final Map<String, MediaStreamTrack> mMediaStreamTracks;
     private final Map<String, VideoCapturer> mVideoCapturers;
+
+    /**
+     * TODO
+     */
+    public EglBase rootEglBase;
+
 
     public WebRTCModule(ReactApplicationContext reactContext) {
         super(reactContext);
@@ -491,7 +497,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         // NOTE: we don't need videoConstraints for now since createVideoSource doesn't accept
         //   videoConstraints, we should extract resolution and pass to startCapture
 
-        // TODO: change getUserMedia constraints format to support new syntax 
+        // TODO: change getUserMedia constraints format to support new syntax
         //   constraint format seems changed, and there is no mandatory any more.
         //   and has a new sytax/attrs to specify resolution
         //   should change `parseConstraints()` according
@@ -521,7 +527,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
                 break;
             case Map:
                 video = constraints.getMap("video");
-                if (video.hasKey("mandatory") && 
+                if (video.hasKey("mandatory") &&
                         video.getType("mandatory") == ReadableType.Map) {
                     videoConstraintsManatory = video.getMap("mandatory");
                 }
@@ -531,7 +537,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
                     errorCallback.invoke(null, "video mandatory constraints not found");
                     return;
                 }
-                
+
                 //videoConstraints = parseConstraints(video);
                 sourceId = getSourceIdConstraint(video);
                 facingMode
@@ -557,7 +563,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
                 //   2. all camera support level should greater than LEGACY
                 //   see: https://developer.android.com/reference/android/hardware/camera2/CameraCharacteristics.html#INFO_SUPPORTED_HARDWARE_LEVEL
                 // TODO Enable camera2 enumerator
-                if (false && Camera2Enumerator.isSupported(context)) {
+                if (Camera2Enumerator.isSupported(context)) {
                     Log.d(TAG, "Creating video capturer using Camera2 API.");
                     videoCapturer = createVideoCapturer(
                         new Camera2Enumerator(context), isFacing, sourceId);
@@ -582,6 +588,14 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
                         = videoConstraintsManatory.hasKey("minFrameRate") ?
                             videoConstraintsManatory.getInt("minFrameRate") :
                             DEFAULT_FPS;
+
+                    // EGL stuff!
+                    if (rootEglBase == null) {
+                        // TODO: this can fail...
+                        rootEglBase = EglBase.create();
+                    }
+                    EglBase.Context renderContext = rootEglBase.getEglBaseContext();
+                    mFactory.setVideoHwAccelerationOptions(renderContext, renderContext);
 
                     videoSource = mFactory.createVideoSource(videoCapturer);
                     videoCapturer.startCapture(videoWidth, videoHeight, videoFps);
@@ -844,7 +858,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         if (sourceId != null) {
             for (String name : deviceNames) {
                 if (name.equals(sourceId)) {
-                    videoCapturer = enumerator.createCapturer(name, new CameraEventsHandler());
+                    videoCapturer = enumerator.createCapturer(name, null);
                     if (videoCapturer != null) {
                         Log.d(TAG, "create user specified camera " + name + " succeeded");
                         return videoCapturer;
@@ -860,7 +874,7 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         String facingStr = isFacing ? "front" : "back";
         for (String name : deviceNames) {
             if (enumerator.isFrontFacing(name) == isFacing) {
-                videoCapturer = enumerator.createCapturer(name, new CameraEventsHandler());
+                videoCapturer = enumerator.createCapturer(name, null);
                 if (videoCapturer != null) {
                     Log.d(TAG, "Create " + facingStr + " camera " + name + " succeeded");
                     return videoCapturer;
