@@ -49,14 +49,29 @@ public class WebRTCModule extends ReactContextBaseJavaModule {
         mPeerConnectionObservers = new SparseArray<PeerConnectionObserver>();
         localStreams = new HashMap<String, MediaStream>();
 
-        PeerConnectionFactory.initializeAndroidGlobals(reactContext, true, true, true);
+        PeerConnectionFactory.initialize(
+            PeerConnectionFactory.InitializationOptions.builder(reactContext)
+                .setEnableVideoHwAcceleration(true)
+                .createInitializationOptions());
 
-        mFactory = new PeerConnectionFactory(null);
         // Initialize EGL contexts required for HW acceleration.
         EglBase.Context eglContext = EglUtils.getRootEglBaseContext();
+
+        final VideoEncoderFactory encoderFactory;
+        final VideoDecoderFactory decoderFactory;
+
         if (eglContext != null) {
-            mFactory.setVideoHwAccelerationOptions(eglContext, eglContext);
+            encoderFactory = new DefaultVideoEncoderFactory(eglContext, true /* enableIntelVp8Encoder */, false /* enableH264HighProfile */);
+            decoderFactory = new DefaultVideoDecoderFactory(eglContext);
+        } else {
+            encoderFactory = new SoftwareVideoEncoderFactory();
+            decoderFactory = new SoftwareVideoDecoderFactory();
         }
+
+        mFactory = PeerConnectionFactory.builder()
+            .setVideoEncoderFactory(encoderFactory)
+            .setVideoDecoderFactory(decoderFactory)
+            .createPeerConnectionFactory();
 
         getUserMediaImpl = new GetUserMediaImpl(this, reactContext);
     }
